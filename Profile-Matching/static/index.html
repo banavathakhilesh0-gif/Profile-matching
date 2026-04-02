@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Profile Matcher AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0f1a;
+      --surface: rgba(255,255,255,0.05);
+      --surface2: rgba(255,255,255,0.09);
+      --border: rgba(255,255,255,0.10);
+      --accent: #7c3aed;
+      --accent2: #06b6d4;
+      --success: #10b981;
+      --danger: #ef4444;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --gradient: linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%);
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated background blobs */
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(100px);
+      opacity: 0.15;
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::before {
+      width: 600px; height: 600px;
+      background: var(--accent);
+      top: -150px; left: -150px;
+      animation: blobMove 12s ease-in-out infinite alternate;
+    }
+    body::after {
+      width: 500px; height: 500px;
+      background: var(--accent2);
+      bottom: -100px; right: -100px;
+      animation: blobMove 10s ease-in-out infinite alternate-reverse;
+    }
+    @keyframes blobMove { 0%{transform:translate(0,0)} 100%{transform:translate(60px,40px)} }
+
+    /* Layout */
+    .app { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* Navbar */
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.2rem 3rem;
+      background: rgba(13,15,26,0.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .logo { font-size: 1.5rem; font-weight: 800; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .nav-right { display: flex; align-items: center; gap: 1rem; }
+    .btn { padding: 0.55rem 1.4rem; border-radius: 50px; border: none; cursor: pointer; font-family: inherit; font-size: 0.875rem; font-weight: 600; transition: all 0.2s; }
+    .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--surface); }
+    .btn-primary { background: var(--gradient); color: #fff; box-shadow: 0 4px 20px rgba(124,58,237,0.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(124,58,237,0.5); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover { transform: translateY(-1px); filter: brightness(1.1); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover { transform: translateY(-1px); filter: brightness(1.1); }
+
+    /* Hero */
+    .hero {
+      text-align: center; padding: 5rem 2rem 3rem;
+    }
+    .hero h1 { font-size: clamp(2.5rem, 6vw, 4rem); font-weight: 800; line-height: 1.1; margin-bottom: 1rem; }
+    .hero h1 span { background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p { color: var(--muted); font-size: 1.1rem; max-width: 520px; margin: 0 auto 2.5rem; }
+
+    /* Search Box */
+    .search-wrap { position: relative; max-width: 480px; margin: 0 auto; }
+    .search-input {
+      width: 100%; padding: 0.9rem 3.5rem 0.9rem 1.4rem;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 16px;
+      font-family: inherit; font-size: 1rem;
+      transition: border 0.2s, box-shadow 0.2s;
+    }
+    .search-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,58,237,0.18); }
+    .search-icon {
+      position: absolute; right: 1.1rem; top: 50%; transform: translateY(-50%);
+      font-size: 1.15rem; cursor: pointer; opacity: 0.5; transition: opacity 0.2s;
+    }
+    .search-icon:hover { opacity: 1; }
+    .suggestions {
+      position: absolute; top: calc(100% + 8px); left: 0; right: 0;
+      background: #13152a; border: 1px solid var(--border); border-radius: 14px;
+      overflow: hidden; z-index: 200; box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+      max-height: 260px; overflow-y: auto; display: none;
+    }
+    .suggestion-item {
+      padding: 0.75rem 1.2rem; cursor: pointer;
+      display: flex; align-items: center; gap: 0.8rem;
+      transition: background 0.15s;
+      font-size: 0.87rem;
+    }
+    .suggestion-item:hover { background: var(--surface2); }
+    .suggestion-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--gradient);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .suggestion-info .s-name { font-weight: 600; }
+    .suggestion-info .s-sub { font-size: 0.73rem; color: var(--muted); }
+    .not-found-msg {
+      margin-top: 1.2rem; padding: 1rem 1.5rem;
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25);
+      border-radius: 14px; display: none; align-items: center; gap: 1rem; flex-wrap: wrap;
+      justify-content: center;
+    }
+    .not-found-msg.show { display: flex; }
+    .not-found-msg span { color: var(--muted); font-size: 0.9rem; }
+    .not-found-msg strong { color: var(--text); }
+
+    /* Main Content */
+    .main { max-width: 1300px; margin: 0 auto; padding: 2rem 2rem 5rem; width: 100%; }
+
+    /* User profile card at top */
+    .profile-bar {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 1.5rem 2rem;
+      margin-bottom: 2.5rem;
+      backdrop-filter: blur(12px);
+      align-items: center; gap: 2rem; flex-wrap: wrap;
+    }
+    .profile-bar.show { display: flex; }
+    .profile-avatar {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: var(--gradient);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .profile-info h3 { font-size: 1.1rem; font-weight: 700; }
+    .profile-info p { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+    .weights-row { display: flex; gap: 1.5rem; margin-left: auto; flex-wrap: wrap; }
+    .weight-chip {
+      text-align: center;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.5rem 1rem;
+      min-width: 90px;
+    }
+    .weight-chip .val { font-size: 1.2rem; font-weight: 700; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .weight-chip .label { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+
+    /* Section heading */
+    .section-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.6rem; }
+    .section-title .pill {
+      font-size: 0.75rem; font-weight: 600; background: var(--accent);
+      padding: 0.2rem 0.7rem; border-radius: 50px; color: #fff;
+    }
+
+    /* Match Cards Grid */
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem; }
+
+    .match-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 1.5rem;
+      backdrop-filter: blur(12px);
+      transition: all 0.3s;
+      position: relative; overflow: hidden;
+      animation: cardIn 0.5s ease both;
+      cursor: pointer;
+    }
+    @keyframes cardIn { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+    .match-card:hover { transform: translateY(-5px); border-color: rgba(124,58,237,0.4); box-shadow: 0 16px 40px rgba(0,0,0,0.3); }
+    .match-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--gradient); border-radius: 20px 20px 0 0;
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .match-card:hover::before { opacity: 1; }
+
+    /* Hide full details in card view as per user request */
+    .match-card .card-desc, .match-card .card-tags, .match-card .card-actions {
+      display: none;
+    }
+
+    .card-rank {
+      position: absolute; top: 1.2rem; right: 1.2rem;
+      font-size: 0.7rem; font-weight: 700; color: var(--muted); letter-spacing: 1px;
+    }
+    .card-top { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+    .card-avatar {
+      width: 50px; height: 50px; border-radius: 50%;
+      background: var(--gradient);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 1.1rem; color: #fff; flex-shrink: 0;
+    }
+    .card-name { font-size: 1rem; font-weight: 700; }
+    .card-sub { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+    .card-mbti {
+      display: inline-block; background: rgba(124,58,237,0.2);
+      color: #a78bfa; border-radius: 6px; padding: 0.15rem 0.5rem;
+      font-size: 0.7rem; font-weight: 700; margin-top: 4px;
+    }
+
+    .score-ring-row { display: flex; align-items: center; gap: 1rem; margin: 1rem 0; }
+    .score-ring {
+      position: relative; width: 68px; height: 68px; flex-shrink: 0;
+    }
+    .score-ring svg { transform: rotate(-90deg); }
+    .score-ring .bg-circle { fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 6; }
+    .score-ring .fg-circle {
+      fill: none; stroke-width: 6; stroke-linecap: round;
+      stroke: url(#scoreGrad);
+      stroke-dasharray: 175;
+      stroke-dashoffset: 175;
+      transition: stroke-dashoffset 1s ease;
+    }
+    .score-center {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      font-size: 0.8rem; font-weight: 800; text-align: center;
+    }
+    .score-bars { flex: 1; }
+    .mini-bar { margin-bottom: 0.5rem; }
+    .mini-bar .bar-label { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--muted); margin-bottom: 3px; }
+    .mini-bar .bar-track { background: rgba(255,255,255,0.07); border-radius: 50px; height: 6px; overflow: hidden; }
+    .mini-bar .bar-fill { height: 100%; border-radius: 50px; background: var(--gradient); transition: width 1s ease; width: 0; }
+
+    .card-desc { font-size: 0.82rem; color: var(--muted); line-height: 1.5; margin-bottom: 1rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .card-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1.2rem; }
+    .tag { font-size: 0.68rem; padding: 0.2rem 0.7rem; border-radius: 50px; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); }
+
+    .card-actions { display: flex; gap: 0.7rem; }
+    .card-actions .btn { flex: 1; padding: 0.6rem; font-size: 0.82rem; }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 2rem; right: 2rem;
+      background: var(--success); color: #fff;
+      padding: 0.9rem 1.5rem; border-radius: 14px;
+      font-weight: 600; font-size: 0.9rem;
+      transform: translateY(100px); opacity: 0;
+      transition: all 0.4s cubic-bezier(.34,1.56,.64,1);
+      z-index: 9999;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.error { background: var(--danger); }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px); z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    }
+    .modal-overlay.show { opacity: 1; pointer-events: all; }
+    .modal {
+      background: #13152a; border: 1px solid var(--border);
+      border-radius: 24px; padding: 2.5rem; width: 100%; max-width: 560px;
+      max-height: 90vh; overflow-y: auto;
+      transform: scale(0.9); transition: transform 0.3s;
+    }
+    .modal-overlay.show .modal { transform: scale(1); }
+    .modal h2 { font-size: 1.5rem; font-weight: 800; margin-bottom: 0.4rem; }
+    .modal p.sub { color: var(--muted); font-size: 0.875rem; margin-bottom: 2rem; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+    .form-group.full { grid-column: 1/-1; }
+    label { font-size: 0.78rem; font-weight: 600; color: var(--muted); }
+    input[type=text], input[type=number], textarea, .modal select {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); padding: 0.7rem 1rem; border-radius: 10px;
+      font-family: inherit; font-size: 0.875rem; width: 100%;
+      transition: border 0.2s;
+    }
+    input:focus, textarea:focus, .modal select:focus { outline: none; border-color: var(--accent); }
+    textarea { resize: vertical; min-height: 80px; }
+    .modal-actions { display: flex; gap: 1rem; margin-top: 1.5rem; }
+    .modal-actions .btn { flex: 1; padding: 0.75rem; font-size: 0.9rem; }
+
+    /* Loader */
+    .loader { display: flex; justify-content: center; padding: 4rem; }
+    .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty { text-align: center; padding: 4rem 2rem; color: var(--muted); }
+    .empty .icon { font-size: 3rem; margin-bottom: 1rem; }
+
+    @media(max-width:640px) {
+      nav { padding: 1rem 1.2rem; }
+      .hero { padding: 3rem 1rem 2rem; }
+      .main { padding: 1rem 1rem 4rem; }
+      .form-grid { grid-template-columns: 1fr; }
+      .weights-row { width: 100%; margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Navbar -->
+  <nav>
+    <div class="logo">✦ MatchAI</div>
+    <div class="nav-right">
+      <button class="btn btn-ghost" onclick="openModal()">➕ Create Profile</button>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <div class="hero">
+    <h1>Find Your <span>Perfect Match</span><br/>Powered by AI</h1>
+    <p>Select your profile to discover compatible professionals using NLP similarity, MBTI logic, and adaptive machine learning.</p>
+    <div class="search-wrap" id="searchWrap">
+      <input
+        class="search-input"
+        id="nameSearch"
+        type="text"
+        placeholder="Search by name, e.g. Abhinav Joshi..."
+        autocomplete="off"
+        oninput="onSearchInput()"
+        onkeydown="onSearchKey(event)"
+      />
+      <span class="search-icon" onclick="triggerSearch()">&#128269;</span>
+      <div class="suggestions" id="suggestions"></div>
+    </div>
+    <div class="not-found-msg" id="notFoundMsg">
+      <span>&#128373;&#65039; <strong id="notFoundName"></strong> does not exist in our system.</span>
+      <button class="btn btn-primary" onclick="openModal()" style="padding:0.5rem 1.2rem;font-size:0.82rem;">&#43; Create Profile</button>
+    </div>
+    <p id="heroError" style="color:#ef4444;margin-top:1rem;font-size:0.9rem;display:none;">&#9888;&#65039; Please type and select a valid profile first.</p>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Profile bar -->
+    <div class="profile-bar" id="profileBar">
+      <div class="profile-avatar" id="profileAvatar">?</div>
+      <div class="profile-info">
+        <h3 id="profileName">—</h3>
+        <p id="profileSub">—</p>
+      </div>
+      <div class="weights-row" id="weightsRow"></div>
+    </div>
+
+    <!-- Matches -->
+    <div id="matchesArea"></div>
+    <div id="loadMoreRow" style="text-align:center;margin-top:2rem;display:none;">
+      <button class="btn btn-ghost" id="loadMoreBtn" onclick="loadMore()">Load More Matches ↓</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detailOverlay" onclick="closeDetailOutside(event)">
+  <div class="modal" id="detailModal">
+    <div id="detailContent"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeDetailModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Registration Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <h2>✨ Create Your Profile</h2>
+    <p class="sub">Your unique User ID will be auto-generated upon creation.</p>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Full Name *</label>
+        <input type="text" id="f_name" placeholder="e.g. Rohan Singh" />
+      </div>
+      <div class="form-group">
+        <label>Age *</label>
+        <input type="number" id="f_age" placeholder="25" min="18" max="60" />
+      </div>
+      <div class="form-group">
+        <label>City / Location *</label>
+        <input type="text" id="f_location" placeholder="e.g. Bangalore" />
+      </div>
+      <div class="form-group">
+        <label>Profession *</label>
+        <input type="text" id="f_profession" placeholder="e.g. Data Scientist" />
+      </div>
+      <div class="form-group">
+        <label>Years of Experience *</label>
+        <input type="number" id="f_exp" placeholder="3" min="0" max="40" />
+      </div>
+      <div class="form-group">
+        <label>MBTI Type *</label>
+        <select id="f_mbti">
+          <option value="">Select MBTI</option>
+          <option>INTJ</option><option>INTP</option><option>ENTJ</option><option>ENTP</option>
+          <option>INFJ</option><option>INFP</option><option>ENFJ</option><option>ENFP</option>
+          <option>ISTJ</option><option>ISFJ</option><option>ESTJ</option><option>ESFJ</option>
+          <option>ISTP</option><option>ISFP</option><option>ESTP</option><option>ESFP</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label>Professional Summary * (2-4 lines: skills, industry, goals)</label>
+        <textarea id="f_profsummary" placeholder="E.g. Data scientist with 3 years in healthcare, skilled in Python, SQL..."></textarea>
+      </div>
+      <div class="form-group full">
+        <label>About Me * (2-4 lines: personality, work style, interests)</label>
+        <textarea id="f_about" placeholder="E.g. I enjoy solving complex problems, mentoring juniors, and hiking on weekends..."></textarea>
+      </div>
+      <div class="form-group full">
+        <label>Interests (comma-separated)</label>
+        <input type="text" id="f_interests" placeholder="e.g. Chess, Reading, Machine Learning, Hiking" />
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitNewUser()">Create Profile 🚀</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- SVG Gradient def for score rings -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="scoreGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<script>
+  let allUsers = [];
+  let currentUserId = null;
+  let currentLimit = 5;
+  let totalMatches = 0;
+  let selectedFromSuggestion = false;
+
+  // ── Fetch all users ──
+  async function loadUsers() {
+    const res = await fetch('/api/users');
+    allUsers = await res.json();
+  }
+
+  function onSearchInput() {
+    const query = document.getElementById('nameSearch').value.trim().toLowerCase();
+    const sugBox = document.getElementById('suggestions');
+    document.getElementById('notFoundMsg').classList.remove('show');
+    selectedFromSuggestion = false;
+
+    if (!query) { sugBox.style.display = 'none'; return; }
+
+    const filtered = allUsers.filter(u =>
+      u.name.toLowerCase().includes(query) ||
+      u.user_id.toLowerCase().includes(query) ||
+      u.profession.toLowerCase().includes(query)
+    ).slice(0, 8);
+
+    if (!filtered.length) { sugBox.style.display = 'none'; return; }
+
+    sugBox.innerHTML = filtered.map(u => {
+      const initials = u.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase();
+      return `<div class="suggestion-item" onclick="selectUser('${u.user_id}', '${u.name.replace(/'/g, "&#39;")}')"
+                   onmousedown="event.preventDefault()">
+        <div class="suggestion-avatar">${initials}</div>
+        <div class="suggestion-info">
+          <div class="s-name">${u.name}</div>
+          <div class="s-sub">${u.profession} &bull; ${u.location} &bull; ${u.mbti}</div>
+        </div>
+      </div>`;
+    }).join('');
+    sugBox.style.display = 'block';
+  }
+
+  function onSearchKey(e) {
+    if (e.key === 'Enter') triggerSearch();
+    if (e.key === 'Escape') document.getElementById('suggestions').style.display = 'none';
+  }
+
+  function triggerSearch() {
+    const query = document.getElementById('nameSearch').value.trim().toLowerCase();
+    if (!query) return;
+    // If user already selected from suggestion, do nothing extra
+    if (selectedFromSuggestion) return;
+    // Try to find an exact or close match
+    const match = allUsers.find(u =>
+      u.name.toLowerCase() === query ||
+      u.user_id.toLowerCase() === query
+    );
+    if (match) {
+      selectUser(match.user_id, match.name);
+    } else {
+      document.getElementById('suggestions').style.display = 'none';
+      const nfName = document.getElementById('notFoundName');
+      nfName.textContent = document.getElementById('nameSearch').value.trim();
+      document.getElementById('notFoundMsg').classList.add('show');
+    }
+  }
+
+  function selectUser(uid, name) {
+    selectedFromSuggestion = true;
+    document.getElementById('nameSearch').value = name;
+    document.getElementById('suggestions').style.display = 'none';
+    document.getElementById('notFoundMsg').classList.remove('show');
+    currentLimit = 5;
+    onUserSelect(uid);
+  }
+
+  function findMatches() {
+    triggerSearch();
+  }
+
+  async function loadMore() {
+    currentLimit += 5;
+    await onUserSelect(currentUserId);
+  }
+
+  async function onUserSelect(uid) {
+    if (!uid) {
+      const sel = document.getElementById('userSelect');
+      uid = sel.value;
+    }
+    if (!uid) return;
+    currentUserId = uid;
+
+    // Show profile bar
+    const user = allUsers.find(u => u.user_id === uid);
+    if (!user) return;
+
+    const initials = user.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase();
+    document.getElementById('profileAvatar').textContent = initials;
+    document.getElementById('profileName').textContent = `${user.name} (${user.user_id})`;
+    document.getElementById('profileSub').textContent = `${user.profession} • ${user.location} • MBTI: ${user.mbti}`;
+    document.getElementById('profileBar').classList.add('show');
+
+    // Show loader
+    document.getElementById('matchesArea').innerHTML = `<div class="loader"><div class="spinner"></div></div>`;
+    document.getElementById('loadMoreRow').style.display = 'none';
+
+    const data = await fetch(`/api/matches/${uid}?limit=${currentLimit}`).then(r => r.json());
+    totalMatches = data.total;
+    renderWeights(data.weights);
+    renderMatches(uid, data.matches);
+
+    // Show/hide Load More
+    const loadMoreRow = document.getElementById('loadMoreRow');
+    if (currentLimit < totalMatches) {
+      loadMoreRow.style.display = 'block';
+      document.getElementById('loadMoreBtn').textContent = `Load More Matches ↓ (showing ${data.matches.length} of ${totalMatches})`;
+    } else {
+      loadMoreRow.style.display = 'none';
+    }
+  }
+
+  function renderWeights(w) {
+    const labels = [{key:'w1',label:'NLP Text'},{key:'w2',label:'MBTI'},{key:'w3',label:'Location'}];
+    document.getElementById('weightsRow').innerHTML = labels.map(l =>
+      `<div class="weight-chip">
+        <div class="val">${(w[l.key]*100).toFixed(0)}%</div>
+        <div class="label">${l.label}</div>
+       </div>`
+    ).join('');
+  }
+
+  function renderMatches(uid, matches) {
+    const area = document.getElementById('matchesArea');
+    if (!matches.length) {
+      area.innerHTML = `<div class="empty"><div class="icon">🔍</div><p>No matches found. Try another profile!</p></div>`;
+      return;
+    }
+
+    area.innerHTML = `
+      <div class="section-title">🌟 Top Matches <span class="pill">${matches.length} found</span></div>
+      <div class="cards-grid" id="cardsGrid"></div>`;
+
+    const grid = document.getElementById('cardsGrid');
+    matches.forEach((m, i) => {
+      const card = buildCard(uid, m, i+1);
+      grid.appendChild(card);
+    });
+
+    // Animate bars and rings after render
+    setTimeout(() => animateCards(), 50);
+  }
+
+  function buildCard(uid, m, rank) {
+    const el = document.createElement('div');
+    el.className = 'match-card';
+    el.style.animationDelay = `${(rank-1)*0.08}s`;
+    el.dataset.total = m.total_score;
+    el.dataset.text = m.text_sim;
+    el.dataset.mbti = m.mbti_match;
+    el.dataset.loc = m.location_match;
+
+    el.onclick = () => showMatchDetails(uid, m);
+
+    const initials = m.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+    const tags = (m.interests||'').split(',').slice(0,4).map(t=>`<span class="tag">${t.trim()}</span>`).join('');
+    const pct = Math.round(m.total_score*100);
+
+    el.innerHTML = `
+      <div class="card-rank">MATCH #${rank}</div>
+      <div class="card-top">
+        <div class="card-avatar">${initials}</div>
+        <div>
+          <div class="card-name">${m.name}</div>
+          <div class="card-sub">${m.profession} • ${m.location}</div>
+          <span class="card-mbti">${m.mbti}</span>
+        </div>
+      </div>
+      <div class="score-ring-row">
+        <div class="score-ring">
+          <svg viewBox="0 0 68 68" width="68" height="68">
+            <circle class="bg-circle" cx="34" cy="34" r="28"/>
+            <circle class="fg-circle" cx="34" cy="34" r="28"/>
+          </svg>
+          <div class="score-center">${pct}%</div>
+        </div>
+        <div class="score-bars">
+          <div class="mini-bar">
+            <div class="bar-label"><span>NLP</span><span>${(m.text_sim*100).toFixed(1)}%</span></div>
+            <div class="bar-track"><div class="bar-fill" data-w="${m.text_sim*100}"></div></div>
+          </div>
+          <div class="mini-bar">
+            <div class="bar-label"><span>MBTI</span><span>${(m.mbti_match*100).toFixed(1)}%</span></div>
+            <div class="bar-track"><div class="bar-fill" data-w="${m.mbti_match*100}"></div></div>
+          </div>
+          <div class="mini-bar">
+            <div class="bar-label"><span>Location</span><span>${(m.location_match*100).toFixed(1)}%</span></div>
+            <div class="bar-track"><div class="bar-fill" data-w="${m.location_match*100}"></div></div>
+          </div>
+        </div>
+      </div>
+      <p class="card-desc">${m.professional_summary}</p>
+      <div class="card-tags">${tags}</div>
+      <div class="card-actions">
+        <button class="btn btn-success" onclick="event.stopPropagation(); sendFeedback('${uid}','${m.user_id}',1,this)">👍 Accept</button>
+        <button class="btn btn-danger"  onclick="event.stopPropagation(); sendFeedback('${uid}','${m.user_id}',0,this)">👎 Reject</button>
+      </div>`;
+    return el;
+  }
+
+  function showMatchDetails(uid, m) {
+    const initials = m.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+    const tags = (m.interests||'').split(',').map(t=>`<span class="tag">${t.trim()}</span>`).join('');
+    
+    document.getElementById('detailContent').innerHTML = `
+      <div class="card-top" style="margin-bottom:2rem;">
+        <div class="card-avatar" style="width:80px;height:80px;font-size:1.8rem;">${initials}</div>
+        <div>
+          <h2 style="margin:0;">${m.name}</h2>
+          <div class="card-sub" style="font-size:1rem;">${m.profession} • ${m.location}</div>
+          <span class="card-mbti" style="font-size:0.9rem;padding:0.3rem 0.8rem;">${m.mbti}</span>
+        </div>
+      </div>
+      
+      <div style="margin-bottom:1.5rem;">
+        <label>Professional Summary</label>
+        <p style="color:var(--text);line-height:1.6;margin-top:0.5rem;font-size:0.95rem;">${m.professional_summary}</p>
+      </div>
+      
+      <div style="margin-bottom:1.5rem;">
+        <label>About Me</label>
+        <p style="color:var(--text);line-height:1.6;margin-top:0.5rem;font-size:0.95rem;">${m.about_me}</p>
+      </div>
+
+      <div style="margin-bottom:2rem;">
+        <label>Interests</label>
+        <div class="card-tags" style="display:flex;margin-top:0.6rem;">${tags}</div>
+      </div>
+
+      <div class="card-actions" style="display:flex;gap:1rem;">
+        <button class="btn btn-success" style="padding:0.8rem;" onclick="sendFeedback('${uid}','${m.user_id}',1,this); closeDetailModal();">👍 Accept Match</button>
+        <button class="btn btn-danger" style="padding:0.8rem;" onclick="sendFeedback('${uid}','${m.user_id}',0,this); closeDetailModal();">👎 Reject Match</button>
+      </div>
+    `;
+    
+    document.getElementById('detailOverlay').classList.add('show');
+  }
+
+  function closeDetailModal() { document.getElementById('detailOverlay').classList.remove('show'); }
+  function closeDetailOutside(e) { if(e.target===document.getElementById('detailOverlay')) closeDetailModal(); }
+
+  function animateCards() {
+    document.querySelectorAll('.fg-circle').forEach(circle => {
+      const card = circle.closest('.match-card');
+      const total = parseFloat(card.dataset.total);
+      const circumference = 175;
+      const offset = circumference - (total * circumference);
+      circle.style.strokeDashoffset = offset;
+    });
+    document.querySelectorAll('.bar-fill').forEach(bar => {
+      bar.style.width = parseFloat(bar.dataset.w) + '%';
+    });
+  }
+
+  async function sendFeedback(uid, mid, action, btn) {
+    btn.disabled = true;
+    btn.textContent = action===1 ? '✓ Accepted' : '✗ Rejected';
+    await fetch('/api/feedback', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({user_id: uid, matched_user_id: mid, action})
+    });
+    showToast(action===1 ? '✅ Match Accepted — Preferences updated!' : '❌ Match Rejected — Preferences updated!', action===0);
+    // Reload matches after a short delay
+    setTimeout(() => onUserSelect(uid), 1500);
+  }
+
+  // ── Modal ──
+  function openModal() { document.getElementById('modalOverlay').classList.add('show'); }
+  function closeModal() { document.getElementById('modalOverlay').classList.remove('show'); }
+  function closeModalOutside(e) { if(e.target===document.getElementById('modalOverlay')) closeModal(); }
+
+  async function submitNewUser() {
+    const payload = {
+      name: document.getElementById('f_name').value.trim(),
+      age: parseInt(document.getElementById('f_age').value)||0,
+      location: document.getElementById('f_location').value.trim(),
+      profession: document.getElementById('f_profession').value.trim(),
+      experience_years: parseInt(document.getElementById('f_exp').value)||0,
+      professional_summary: document.getElementById('f_profsummary').value.trim(),
+      about_me: document.getElementById('f_about').value.trim(),
+      mbti: document.getElementById('f_mbti').value,
+      interests: document.getElementById('f_interests').value.trim(),
+    };
+    if (!payload.name||!payload.location||!payload.profession||!payload.professional_summary||!payload.about_me||!payload.mbti) {
+      showToast('⚠️ Please fill in all required fields.', true); return;
+    }
+    const res = await fetch('/api/users', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    closeModal();
+    showToast(`✅ Profile created! Your ID is ${data.user_id}`);
+    await loadUsers();
+    document.getElementById('userSelect').value = data.user_id;
+    onUserSelect();
+  }
+
+  function showToast(msg, isError=false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = isError ? 'error show' : 'show';
+    setTimeout(()=>{ t.className = t.className.replace(' show',''); }, 3500);
+  }
+
+  // Init
+  loadUsers();
+</script>
+</body>
+</html>
